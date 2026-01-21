@@ -21,11 +21,7 @@ const styles = StyleSheet.create({
 
     marginHorizontal: 20,
     marginVertical: 25,
-
-     
     elevation: 6,
-
-    // iOS shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

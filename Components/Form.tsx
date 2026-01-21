@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import Footer from './Footer';
- 
+
 
 export default function Form() {
   const [name, setName] = useState('');
@@ -23,6 +23,11 @@ export default function Form() {
   const [employeeType, setEmployeeType] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
   const [open, setOpen] = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [editId, setEditId] = useState<number | null>(null);
+const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+
   const [items, setItems] = useState([
     { label: 'HR', value: 'HR' },
     // { label: 'Development', value: 'Development' },
@@ -72,171 +77,272 @@ export default function Form() {
   const handleSubmit = () => {
     if (!validateForm()) return;
 
-    Alert.alert(
-      'Employee Added',
-      `Name: ${name}\nEmail: ${email}\nAge: ${age}\nDept: ${department}`
-    );
+    if (editId !== null) {
+      // UPDATE
+      setEmployees(prev =>
+        prev.map(emp =>
+          emp.id === editId
+            ? {
+              ...emp,
+              name,
+              email,
+              age,
+              phone,
+              address,
+              employeeType,
+              department,
+            }
+            : emp
+        )
+      );
+      setEditId(null);
+    } else {
+      // ADD
+      const newEmployee = {
+        id: Date.now(),
+        name,
+        email,
+        age,
+        phone,
+        address,
+        employeeType,
+        department,
+      };
 
+      setEmployees(prev => [...prev, newEmployee]);
+    }
+
+    // Clear form
     setName('');
     setEmail('');
     setAge('');
-    setDepartment(null);
     setPhone('');
     setAddress('');
     setEmployeeType('');
+    setDepartment(null);
     setErrors({});
   };
+  const handleEdit = (item: any) => {
+    setName(item.name);
+    setEmail(item.email);
+    setAge(item.age);
+    setPhone(item.phone);
+    setAddress(item.address);
+    setEmployeeType(item.employeeType);
+    setDepartment(item.department);
+    setEditId(item.id);
+  };
+
+  const handleDelete = (id: number) => {
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel' },
+      {
+        text: 'Delete',
+        onPress: () => {
+          setEmployees(prev => prev.filter(emp => emp.id !== id));
+          setName('');
+          setEmail('');
+          setAge('');
+          setPhone('');
+          setAddress('');
+          setEmployeeType('');
+          setDepartment(null);
+          setErrors({});
+
+        }
+
+
+
+
+
+      }
+
+    ]);
+  };
+
 
   return (
     <>
-  
-    <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
 
-        <Text style={styles.title}>Employee Registration</Text>
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
 
-        {/* NAME */}
-        <Text style={{ fontWeight: '600', marginBottom: 5 }}>Name</Text>
+          <Text style={styles.title}>Employee Registration</Text>
 
-        <TextInput
-          style={[styles.input, errors.name && styles.errorBorder]}
-          placeholder="Name"
-          value={name}
-          onChangeText={(t) => {
-            setName(t);
-            setErrors(p => ({ ...p, name: null }));
-          }}
-        />
-        {errors.name && <Text style={styles.error}>{errors.name}</Text>}
+          {/* NAME */}
+          <Text style={{ fontWeight: '600', marginBottom: 5 }}>Name</Text>
 
-         
-
-        <Text style={{ fontWeight: '600', marginBottom: 5 }}>Email</Text>
-        <TextInput
-          style={[styles.input, errors.email && styles.errorBorder]}
-          placeholder="Email"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            setErrors(p => ({ ...p, email: null }));
-          }}
-        />
-        {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+          <TextInput
+            style={[styles.input, errors.name && styles.errorBorder]}
+            placeholder="Name"
+            value={name}
+            onChangeText={(t) => {
+              setName(t);
+              setErrors(p => ({ ...p, name: null }));
+            }}
+          />
+          {errors.name && <Text style={styles.error}>{errors.name}</Text>}
 
 
 
-        {/* AGE */}
-        <Text style={{ fontWeight: '600', marginBottom: 5 }}>Age</Text>
-
-        <TextInput
-          style={[styles.input, errors.age && styles.errorBorder]}
-          placeholder="Age"
-          keyboardType="numeric"
-          value={age}
-          onChangeText={(text) => {
-            setAge(text);
-
-            if (!text.trim()) {
-              setErrors(prev => ({ ...prev, age: 'Age is required' }));
-            } else if (isNaN(Number(text)) || Number(text) < 18 || Number(text) > 60) {
-              setErrors(prev => ({ ...prev, age: 'Age must be 18–60' }));
-            } else {
-              setErrors(prev => ({ ...prev, age: null }));
-            }
-          }}
-        />
-
-        {errors.age && <Text style={styles.error}>{errors.age}</Text>}
-
-        {/* PHONE */}
-        <Text style={{ fontWeight: '600', marginBottom: 5 }}>Phone No</Text>
-
-
-        <TextInput
-          style={[styles.input, errors.phone && styles.errorBorder]}
-          placeholder="Phone Number"
-          keyboardType="phone-pad"
-          maxLength={10}
-          value={phone}
-          onChangeText={(text) => {
-            // Allow only numbers
-            const numericValue = text.replace(/[^0-9]/g, '');
-            setPhone(numericValue);
-
-            const phoneRegex = /^[6-9]\d{9}$/;
-
-            if (!numericValue) {
-              setErrors(prev => ({ ...prev, phone: 'Phone number is required' }));
-            } else if (!phoneRegex.test(numericValue)) {
-              setErrors(prev => ({ ...prev, phone: 'Enter valid 10-digit phone number' }));
-            } else {
-              setErrors(prev => ({ ...prev, phone: null }));
-            }
-          }}
-        />    
-        {errors.phone && <Text style={styles.error}>{errors.phone}</Text>}
+          <Text style={{ fontWeight: '600', marginBottom: 5 }}>Email</Text>
+          <TextInput
+            style={[styles.input, errors.email && styles.errorBorder]}
+            placeholder="Email"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={(t) => {
+              setEmail(t);
+              setErrors(p => ({ ...p, email: null }));
+            }}
+          />
+          {errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
 
 
-        {/* ADDRESS */}
-        <Text style={{ fontWeight: '600', marginBottom: 5 }}>Address</Text>
+          {/* AGE */}
+          <Text style={{ fontWeight: '600', marginBottom: 5 }}>Age</Text>
 
-        <TextInput
-          style={[styles.input, errors.address && styles.errorBorder]}
-          placeholder="Address"
-          value={address}
-          onChangeText={(t) => {
-            setAddress(t);
-            setErrors(p => ({ ...p, address: null }));
-          }}
-        />
-        {errors.address && <Text style={styles.error}>{errors.address}</Text>}
+          <TextInput
+            style={[styles.input, errors.age && styles.errorBorder]}
+            placeholder="Age"
+            keyboardType="numeric"
+            value={age}
+            onChangeText={(text) => {
+              setAge(text);
 
-        {/* EMPLOYEE TYPE */}
-        <Text style={{ fontWeight: '600' }}>Employee Type</Text>
-        <View style={styles.radioGroup}>
-          {['Full Time', 'Intern', 'Intern (Unpaid)'].map(type => (
-            <TouchableOpacity
-              key={type}
-              style={[
-                styles.radioItem,
-                employeeType === type && styles.radioSelected
-              ]}
-              onPress={() => {
-                setEmployeeType(type);
-                setErrors(p => ({ ...p, employeeType: null }));
-              }}
-            >
-              <Text>{type}</Text>
-            </TouchableOpacity>
+              if (!text.trim()) {
+                setErrors(prev => ({ ...prev, age: 'Age is required' }));
+              } else if (isNaN(Number(text)) || Number(text) < 18 || Number(text) > 60) {
+                setErrors(prev => ({ ...prev, age: 'Age must be 18–60' }));
+              } else {
+                setErrors(prev => ({ ...prev, age: null }));
+              }
+            }}
+          />
+
+          {errors.age && <Text style={styles.error}>{errors.age}</Text>}
+
+
+          <Text style={{ fontWeight: '600', marginBottom: 5 }}>Phone No</Text>
+
+
+          <TextInput
+            style={[styles.input, errors.phone && styles.errorBorder]}
+            placeholder="Phone Number"
+            keyboardType="phone-pad"
+            maxLength={10}
+            value={phone}
+            onChangeText={(text) => {
+              // Allow only numbers
+              const numericValue = text.replace(/[^0-9]/g, '');
+              setPhone(numericValue);
+
+              const phoneRegex = /^[6-9]\d{9}$/;
+
+              if (!numericValue) {
+                setErrors(prev => ({ ...prev, phone: 'Phone number is required' }));
+              } else if (!phoneRegex.test(numericValue)) {
+                setErrors(prev => ({ ...prev, phone: 'Enter valid 10-digit phone number' }));
+              } else {
+                setErrors(prev => ({ ...prev, phone: null }));
+              }
+            }}
+          />
+          {errors.phone && <Text style={styles.error}>{errors.phone}</Text>}
+
+
+
+          {/* ADDRESS */}
+          <Text style={{ fontWeight: '600', marginBottom: 5 }}>Address</Text>
+
+          <TextInput
+            style={[styles.input, errors.address && styles.errorBorder]}
+            placeholder="Address"
+            value={address}
+            onChangeText={(t) => {
+              setAddress(t);
+              setErrors(p => ({ ...p, address: null }));
+            }}
+          />
+          {errors.address && <Text style={styles.error}>{errors.address}</Text>}
+
+          {/* EMPLOYEE TYPE */}
+          <Text style={{ fontWeight: '600' }}>Employee Type</Text>
+          <View style={styles.radioGroup}>
+            {['Full Time', 'Intern', 'Intern (Unpaid)'].map(type => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.radioItem,
+                  employeeType === type && styles.radioSelected
+                ]}
+                onPress={() => {
+                  setEmployeeType(type);
+                  setErrors(p => ({ ...p, employeeType: null }));
+                }}
+              >
+                <Text>{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {errors.employeeType && <Text style={styles.error}>{errors.employeeType}</Text>}
+
+          {/* DEPARTMENT */}
+          <DropDownPicker
+            open={open}
+            value={department}
+            items={items}
+            setOpen={setOpen}
+            setValue={(cb) => {
+              const val = cb(department);
+              setDepartment(val);
+              setErrors(p => ({ ...p, department: null }));
+            }}
+            setItems={setItems}
+            placeholder="Select Department"
+          />
+          {errors.department && <Text style={styles.error}>{errors.department}</Text>}
+
+          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+            <Text style={styles.buttonText}>Submit</Text>
+
+          </TouchableOpacity>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginTop: 20 }}>
+            Employee List
+          </Text>
+
+          {employees.map(item => (
+            <View key={item.id} style={styles.card}>
+              <Text><Text style={{ fontWeight: '600' }}>Name:</Text> {item.name}</Text>
+              <Text>Email: {item.email}</Text>
+              <Text>Age: {item.age}</Text>
+              <Text>Phone: {item.phone}</Text>
+              <Text>Dept: {item.department}</Text>
+              <Text>Type: {item.employeeType}</Text>
+
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={() => handleEdit(item)}
+                >
+                  <Text style={styles.btnText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDelete(item.id)}
+                >
+                  <Text style={styles.btnText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ))}
-        </View>
-        {errors.employeeType && <Text style={styles.error}>{errors.employeeType}</Text>}
 
-        {/* DEPARTMENT */}
-        <DropDownPicker
-          open={open}
-          value={department}
-          items={items}
-          setOpen={setOpen}
-          setValue={(cb) => {
-            const val = cb(department);
-            setDepartment(val);
-            setErrors(p => ({ ...p, department: null }));
-          }}
-          setItems={setItems}
-          placeholder="Select Department"
-        />
-        {errors.department && <Text style={styles.error}>{errors.department}</Text>}
-
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Submit</Text>
-        </TouchableOpacity>
           {/* <Footer /> */}
-      </ScrollView>
-    </View>
-    
+        </ScrollView>
+      </View>
+
     </>
   );
 }
@@ -329,6 +435,36 @@ const styles = StyleSheet.create({
   radioText: {
     fontSize: 14,
     color: '#000',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 6,
+    marginVertical: 8,
+    elevation: 2,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+
+  editBtn: {
+    backgroundColor: '#22c55e',
+    padding: 8,
+    borderRadius: 5,
+  },
+
+  deleteBtn: {
+    backgroundColor: '#ef4444',
+    padding: 8,
+    borderRadius: 5,
+  },
+
+  btnText: {
+    color: '#fff',
+    fontSize: 13,
   },
 
 });
