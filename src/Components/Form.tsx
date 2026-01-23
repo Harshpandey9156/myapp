@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,23 +10,38 @@ import {
   ScrollView,
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
-import Footer from './Footer';
+// import Footer from './Footer';
+import { supabase } from '../../lib/supabase';
+
+
+type Employee = {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  phone: string;
+  address: string;
+  employee_type: string;
+  department: string;
+  created_at?: string | null;
+};
+
 
 
 export default function Form() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [age, setAge] = useState('');
-  const [department, setDepartment] = useState(null);
+  const [department, setDepartment] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [employeeType, setEmployeeType] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
   const [open, setOpen] = useState(false);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [editId, setEditId] = useState<number | null>(null);
-const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+const [employees, setEmployees] = useState<Employee[]>([]);
+  const [editId, setEditId] = useState<string | null>(null);
+// const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+// const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
 
   const [items, setItems] = useState([
     { label: 'HR', value: 'HR' },
@@ -38,6 +53,16 @@ const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   ]);
 
 
+
+
+    useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+
+
+
+  // Validation check for the form fields
   const validateForm = () => {
     let newErrors: { [key: string]: string } = {};
 
@@ -74,45 +99,53 @@ const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (!validateForm()) return;
 
-    if (editId !== null) {
+
+
+
+
+//Handle submit function
+
+
+
+
+const handleSubmit = async () => {
+  if (!validateForm()) return;
+
+  const payload = {
+    name,
+    email,
+    age: Number(age),
+    phone,
+    address,
+    employee_type: employeeType,
+    department,
+  };
+
+  try {
+    if (editId) {
       // UPDATE
-      setEmployees(prev =>
-        prev.map(emp =>
-          emp.id === editId
-            ? {
-              ...emp,
-              name,
-              email,
-              age,
-              phone,
-              address,
-              employeeType,
-              department,
-            }
-            : emp
-        )
-      );
-      setEditId(null);
-    } else {
-      // ADD
-      const newEmployee = {
-        id: Date.now(),
-        name,
-        email,
-        age,
-        phone,
-        address,
-        employeeType,
-        department,
-      };
+      const { error } = await supabase
+        .from('employees')
+        .update(payload)
+        .eq('id', editId);
 
-      setEmployees(prev => [...prev, newEmployee]);
+      if (error) throw error;
+    } else {
+      // INSERT
+      const { error } = await supabase
+        .from('employees')
+        .insert([payload]);
+
+      if (error) throw error;
     }
 
-    // Clear form
+    Alert.alert('Success', 'Employee saved successfully');
+
+    // Refresh list
+    fetchEmployees();
+
+    // Reset form
     setName('');
     setEmail('');
     setAge('');
@@ -120,45 +153,76 @@ const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
     setAddress('');
     setEmployeeType('');
     setDepartment(null);
+    setEditId(null);
     setErrors({});
-  };
-  const handleEdit = (item: any) => {
-    setName(item.name);
-    setEmail(item.email);
-    setAge(item.age);
-    setPhone(item.phone);
-    setAddress(item.address);
-    setEmployeeType(item.employeeType);
-    setDepartment(item.department);
-    setEditId(item.id);
-  };
+  } catch (err) {
+    console.log(err);
+    Alert.alert('Error', 'Something went wrong');
+  }
+};
+ 
 
-  const handleDelete = (id: number) => {
-    Alert.alert('Delete', 'Are you sure?', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete',
-        onPress: () => {
-          setEmployees(prev => prev.filter(emp => emp.id !== id));
-          setName('');
-          setEmail('');
-          setAge('');
-          setPhone('');
-          setAddress('');
-          setEmployeeType('');
-          setDepartment(null);
-          setErrors({});
 
+
+
+
+const handleEdit = (item: Employee) => {
+  setName(item.name);
+  setEmail(item.email);
+  setAge(String(item.age));
+  setPhone(item.phone);
+  setAddress(item.address);
+  setEmployeeType(item.employee_type);
+  setDepartment(item.department);
+  setEditId(item.id);
+};
+
+
+
+
+  const handleDelete = (id: string) => {
+  Alert.alert('Delete', 'Are you sure?', [
+    { text: 'Cancel' },
+    {
+      text: 'Delete',
+      onPress: async () => {
+        const { error } = await supabase
+          .from('employees')
+          .delete()
+          .eq('id', id);
+
+        if (!error) {
+          fetchEmployees();
         }
+      },
+    },
+  ]);
+};
+
+
+  
 
 
 
 
 
-      }
+  const fetchEmployees = async () => {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-    ]);
-  };
+  if (error) {
+    console.log('Fetch error:', error);
+  } else {
+    setEmployees(data);
+  }
+};
+
+
+
+
+
 
 
   return (
@@ -319,7 +383,7 @@ const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
               <Text>Age: {item.age}</Text>
               <Text>Phone: {item.phone}</Text>
               <Text>Dept: {item.department}</Text>
-              <Text>Type: {item.employeeType}</Text>
+              <Text>Type: {item.employee_type}</Text>
 
               <View style={styles.actionRow}>
                 <TouchableOpacity

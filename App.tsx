@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Header from './Components/Header';
-import Footer from './Components/Footer';
-import Form from './Components/Form';
+import Header from './src/Components/Header';
+import Footer from './src/Components/Footer';
+import Form from './src/Components/Form';
 
 const App = () => {
   return (

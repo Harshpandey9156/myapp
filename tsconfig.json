@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["jest"],
   },
-  "include": ["**/*.ts", "**/*.tsx", "src/supabase.js"],
+  "include": ["**/*.ts", "**/*.tsx", "lib/supabase.js"],
   "exclude": ["**/node_modules", "**/Pods"]
 }
