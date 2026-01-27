@@ -1,5 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+const OFFLINE_KEY = 'offline_employees';
+
 import {
   View,
   Text,
@@ -38,10 +42,11 @@ export default function Form() {
   const [employeeType, setEmployeeType] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
   const [open, setOpen] = useState(false);
-const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
-// const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-// const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  // const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  // const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
 
   const [items, setItems] = useState([
     { label: 'HR', value: 'HR' },
@@ -54,13 +59,42 @@ const [employees, setEmployees] = useState<Employee[]>([]);
 
 
 
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
 
-    useEffect(() => {
+      if (state.isConnected) {
+        syncOfflineData();
+      }
+    });
+
     fetchEmployees();
+
+    return () => unsubscribe();
   }, []);
 
 
+  const syncOfflineData = async () => {
+    const localData =
+      JSON.parse(await AsyncStorage.getItem(OFFLINE_KEY) || "[]") || [];
 
+    if (localData.length === 0) return;
+
+    for (let item of localData) {
+      const { data } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('id', item.id)
+        .single();
+
+      if (!data) {
+        await supabase.from('employees').insert([item]);
+      }
+    }
+
+
+    await AsyncStorage.removeItem(OFFLINE_KEY);
+  };
 
   // Validation check for the form fields
   const validateForm = () => {
@@ -104,48 +138,117 @@ const [employees, setEmployees] = useState<Employee[]>([]);
 
 
 
-//Handle submit function
+  //Handle submit function
 
 
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    const payload = {
+      id: editId || Date.now().toString(),
+      name,
+      email,
+      age: Number(age),
+      phone,
+      address,
+      employee_type: employeeType,
+      department,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      if (!isOnline) {
 
 
-const handleSubmit = async () => {
-  if (!validateForm()) return;
+        const existing =
+          JSON.parse(await AsyncStorage.getItem(OFFLINE_KEY) || "[]") || [];
 
-  const payload = {
-    name,
-    email,
-    age: Number(age),
-    phone,
-    address,
-    employee_type: employeeType,
-    department,
+        existing.push(payload);
+
+        await AsyncStorage.setItem(
+          OFFLINE_KEY,
+          JSON.stringify(existing)
+        );
+
+        Alert.alert('Offline', 'Saved locally. Will sync when online.');
+      } else {
+
+        if (editId) {
+          await supabase.from('employees').update(payload).eq('id', editId);
+        } else {
+          await supabase.from('employees').insert([payload]);
+        }
+      }
+
+      resetForm();
+      fetchEmployees();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save');
+    }
   };
 
-  try {
-    if (editId) {
-      // UPDATE
-      const { error } = await supabase
-        .from('employees')
-        .update(payload)
-        .eq('id', editId);
 
-      if (error) throw error;
-    } else {
-      // INSERT
-      const { error } = await supabase
-        .from('employees')
-        .insert([payload]);
 
-      if (error) throw error;
+
+
+  const handleEdit = (item: Employee) => {
+    setName(item.name);
+    setEmail(item.email);
+    setAge(String(item.age));
+    setPhone(item.phone);
+    setAddress(item.address);
+    setEmployeeType(item.employee_type);
+    setDepartment(item.department);
+    setEditId(item.id);
+  };
+
+
+
+
+  const handleDelete = (id: string) => {
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel' },
+      {
+        text: 'Delete',
+        onPress: async () => {
+          const { error } = await supabase
+            .from('employees')
+            .delete()
+            .eq('id', id);
+// check//
+          if (!error) {
+            fetchEmployees();
+          }
+        },
+      },
+    ]);
+  };
+
+
+
+
+
+
+
+  const fetchEmployees = async () => {
+    if (!isOnline) {
+      const local =
+        JSON.parse(await AsyncStorage.getItem(OFFLINE_KEY) || "[]") || [];
+      setEmployees(local);
+      return;
     }
+// else 
+    const { data } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    Alert.alert('Success', 'Employee saved successfully');
+    setEmployees(data || []);
+  };
 
-    // Refresh list
-    fetchEmployees();
 
-    // Reset form
+
+  const resetForm = () => {
     setName('');
     setEmail('');
     setAge('');
@@ -155,72 +258,7 @@ const handleSubmit = async () => {
     setDepartment(null);
     setEditId(null);
     setErrors({});
-  } catch (err) {
-    console.log(err);
-    Alert.alert('Error', 'Something went wrong');
-  }
-};
- 
-
-
-
-
-
-const handleEdit = (item: Employee) => {
-  setName(item.name);
-  setEmail(item.email);
-  setAge(String(item.age));
-  setPhone(item.phone);
-  setAddress(item.address);
-  setEmployeeType(item.employee_type);
-  setDepartment(item.department);
-  setEditId(item.id);
-};
-
-
-
-
-  const handleDelete = (id: string) => {
-  Alert.alert('Delete', 'Are you sure?', [
-    { text: 'Cancel' },
-    {
-      text: 'Delete',
-      onPress: async () => {
-        const { error } = await supabase
-          .from('employees')
-          .delete()
-          .eq('id', id);
-
-        if (!error) {
-          fetchEmployees();
-        }
-      },
-    },
-  ]);
-};
-
-
-  
-
-
-
-
-
-  const fetchEmployees = async () => {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.log('Fetch error:', error);
-  } else {
-    setEmployees(data);
-  }
-};
-
-
-
+  };
 
 
 
@@ -264,7 +302,7 @@ const handleEdit = (item: Employee) => {
 
 
 
-          {/* AGE */}
+          {/* Age */}
           <Text style={{ fontWeight: '600', marginBottom: 5 }}>Age</Text>
 
           <TextInput
